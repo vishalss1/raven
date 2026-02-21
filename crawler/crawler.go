@@ -1,6 +1,8 @@
 package crawler
 
 import (
+	"context"
+	"fmt"
 	"net/url"
 
 	"raven/parser"
@@ -12,14 +14,14 @@ type Config struct {
 	WorkerCount int
 }
 
-func Run(seeds []string, cfg Config) {
+func Run(ctx context.Context, seeds []string, cfg Config) {
 	jobs := make(chan Job, cfg.WorkerCount*10)
 	results := make(chan Result, cfg.WorkerCount)
 	visited := NewVisited()
-	rl := NewRateLimiter(1, 3) // 1 req/sec per domain, burst of 3
+	rl := NewRateLimiter(1, 3)
 
 	for i := 1; i <= cfg.WorkerCount; i++ {
-		go Worker(i, jobs, results, rl)
+		go Worker(ctx, i, jobs, results, rl)
 	}
 
 	activeJobs := 0
@@ -37,35 +39,44 @@ func Run(seeds []string, cfg Config) {
 	}
 
 	for activeJobs > 0 {
-		result := <-results
-		activeJobs--
+		select {
+		case <-ctx.Done():
+			fmt.Println("\nCrawl cancelled — shutting down cleanly")
+			close(jobs)
+			return
+		case result := <-results:
+			activeJobs--
 
-		job := result.Job
-
-		if job.Depth >= cfg.MaxDepth {
-			continue
-		}
-
-		for _, link := range result.Links {
-			if !parser.SameHost(job.BaseHost, link) {
+			job := result.Job
+			if job.Depth >= cfg.MaxDepth {
 				continue
 			}
-			if visited.Size() >= cfg.MaxPages {
-				continue
-			}
-			normalized := parser.NormalizeURL(link)
-			if visited.CheckAndMark(normalized) {
-				activeJobs++
-				go func(j Job) {
-					jobs <- j
-				}(Job{
-					URL:      normalized,
-					BaseHost: job.BaseHost,
-					Depth:    job.Depth + 1,
-				})
+
+			for _, link := range result.Links {
+				if !parser.SameHost(job.BaseHost, link) {
+					continue
+				}
+				if visited.Size() >= cfg.MaxPages {
+					continue
+				}
+				normalized := parser.NormalizeURL(link)
+				if visited.CheckAndMark(normalized) {
+					activeJobs++
+					go func(j Job) {
+						select {
+						case jobs <- j:
+						case <-ctx.Done():
+						}
+					}(Job{
+						URL:      normalized,
+						BaseHost: job.BaseHost,
+						Depth:    job.Depth + 1,
+					})
+				}
 			}
 		}
 	}
 
 	close(jobs)
+	fmt.Printf("Done. Crawled %d pages.\n", visited.Size())
 }
