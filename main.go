@@ -38,6 +38,9 @@ func main() {
 		MaxPages:    maxPages,
 		WorkerCount: 3,
 		OutputPath:  "results.json",
+		OnResult: func(url string, depth, linksFound int) {
+			fmt.Printf("  → streamed: [depth %d] %s (%d links)\n", depth, url, linksFound)
+		},
 	}
 
 	crawler.Run(ctx, seeds, cfg)

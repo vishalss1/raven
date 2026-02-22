@@ -14,6 +14,7 @@ type Config struct {
 	MaxPages    int
 	WorkerCount int
 	OutputPath  string
+	OnResult    func(url string, depth, linksFound int) // optional callback
 }
 
 func Run(ctx context.Context, seeds []string, cfg Config) {
@@ -59,6 +60,11 @@ func Run(ctx context.Context, seeds []string, cfg Config) {
 			job := result.Job
 			writer.Add(job.URL, job.Depth, len(result.Links))
 
+			// stream result to caller if callback is set
+			if cfg.OnResult != nil {
+				cfg.OnResult(job.URL, job.Depth, len(result.Links))
+			}
+
 			if job.Depth >= cfg.MaxDepth {
 				continue
 			}
@@ -76,7 +82,6 @@ func Run(ctx context.Context, seeds []string, cfg Config) {
 					continue
 				}
 
-				// robots.txt check before dispatching
 				if !robots.IsAllowed(ctx, parsed.Host, parsed.Path) {
 					fmt.Printf("  blocked by robots.txt: %s\n", link)
 					continue
