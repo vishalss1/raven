@@ -75,7 +75,7 @@ Output is written to `results.json` in the project root.
 ## Library Usage
 
 ```go
-import "github.com/visha/raven/crawler"
+import "github.com/vishalss1/raven/crawler"
 
 cfg := crawler.Config{
     MaxDepth:    3,
