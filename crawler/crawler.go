@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
+	"raven/output"
 	"raven/parser"
 )
 
@@ -12,6 +13,7 @@ type Config struct {
 	MaxDepth    int
 	MaxPages    int
 	WorkerCount int
+	OutputPath  string
 }
 
 func Run(ctx context.Context, seeds []string, cfg Config) {
@@ -19,6 +21,7 @@ func Run(ctx context.Context, seeds []string, cfg Config) {
 	results := make(chan Result, cfg.WorkerCount)
 	visited := NewVisited()
 	rl := NewRateLimiter(1, 3)
+	writer := output.NewWriter(cfg.OutputPath)
 
 	for i := 1; i <= cfg.WorkerCount; i++ {
 		go Worker(ctx, i, jobs, results, rl)
@@ -43,11 +46,14 @@ func Run(ctx context.Context, seeds []string, cfg Config) {
 		case <-ctx.Done():
 			fmt.Println("\nCrawl cancelled — shutting down cleanly")
 			close(jobs)
+			writer.Flush()
 			return
 		case result := <-results:
 			activeJobs--
 
 			job := result.Job
+			writer.Add(job.URL, job.Depth, len(result.Links))
+
 			if job.Depth >= cfg.MaxDepth {
 				continue
 			}
@@ -78,5 +84,6 @@ func Run(ctx context.Context, seeds []string, cfg Config) {
 	}
 
 	close(jobs)
-	fmt.Printf("Done. Crawled %d pages.\n", visited.Size())
+	writer.Flush()
+	fmt.Printf("Done. Crawled %d pages → %s\n", visited.Size(), cfg.OutputPath)
 }

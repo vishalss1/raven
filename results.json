@@ -1,0 +1,122 @@
+[
+  {
+    "url": "https://github.com",
+    "depth": 0,
+    "links_found": 141,
+    "crawled_at": "2026-02-22T16:56:51.9688515+05:30"
+  },
+  {
+    "url": "https://github.com/opensearch.xml",
+    "depth": 1,
+    "links_found": 0,
+    "crawled_at": "2026-02-22T16:56:51.9961868+05:30"
+  },
+  {
+    "url": "https://github.com/fluidicon.png",
+    "depth": 1,
+    "links_found": 0,
+    "crawled_at": "2026-02-22T16:56:52.5254977+05:30"
+  },
+  {
+    "url": "https://github.com/features/spark",
+    "depth": 1,
+    "links_found": 142,
+    "crawled_at": "2026-02-22T16:56:53.0622304+05:30"
+  },
+  {
+    "url": "https://github.com/login",
+    "depth": 1,
+    "links_found": 41,
+    "crawled_at": "2026-02-22T16:56:54.1343226+05:30"
+  },
+  {
+    "url": "https://github.com/",
+    "depth": 1,
+    "links_found": 141,
+    "crawled_at": "2026-02-22T16:56:54.9456788+05:30"
+  },
+  {
+    "url": "https://github.com/features/models",
+    "depth": 1,
+    "links_found": 139,
+    "crawled_at": "2026-02-22T16:56:56.1061324+05:30"
+  },
+  {
+    "url": "https://github.com/manifest.json",
+    "depth": 1,
+    "links_found": 0,
+    "crawled_at": "2026-02-22T16:56:56.9593438+05:30"
+  },
+  {
+    "url": "https://github.com/mcp",
+    "depth": 1,
+    "links_found": 160,
+    "crawled_at": "2026-02-22T16:56:58.2585061+05:30"
+  },
+  {
+    "url": "https://github.com/features/codespaces",
+    "depth": 1,
+    "links_found": 152,
+    "crawled_at": "2026-02-22T16:56:59.139824+05:30"
+  },
+  {
+    "url": "https://github.com/features/actions",
+    "depth": 1,
+    "links_found": 139,
+    "crawled_at": "2026-02-22T16:56:59.7432582+05:30"
+  },
+  {
+    "url": "https://github.com/features/issues",
+    "depth": 1,
+    "links_found": 137,
+    "crawled_at": "2026-02-22T16:57:01.0780326+05:30"
+  },
+  {
+    "url": "https://github.com/security/advanced-security",
+    "depth": 1,
+    "links_found": 147,
+    "crawled_at": "2026-02-22T16:57:02.0806913+05:30"
+  },
+  {
+    "url": "https://github.com/features/copilot",
+    "depth": 1,
+    "links_found": 185,
+    "crawled_at": "2026-02-22T16:57:03.1169842+05:30"
+  },
+  {
+    "url": "https://github.com/security/advanced-security/code-security",
+    "depth": 1,
+    "links_found": 142,
+    "crawled_at": "2026-02-22T16:57:04.0683939+05:30"
+  },
+  {
+    "url": "https://github.com/why-github",
+    "depth": 1,
+    "links_found": 137,
+    "crawled_at": "2026-02-22T16:57:05.1162083+05:30"
+  },
+  {
+    "url": "https://github.com/features/code-review",
+    "depth": 1,
+    "links_found": 141,
+    "crawled_at": "2026-02-22T16:57:06.0800215+05:30"
+  },
+  {
+    "url": "https://github.com/features",
+    "depth": 1,
+    "links_found": 187,
+    "crawled_at": "2026-02-22T16:57:07.1691866+05:30"
+  },
+  {
+    "url": "https://github.com/security/advanced-security/secret-protection",
+    "depth": 1,
+    "links_found": 139,
+    "crawled_at": "2026-02-22T16:57:08.1882697+05:30"
+  },
+  {
+    "url": "https://github.com/marketplace",
+    "depth": 1,
+    "links_found": 191,
+    "crawled_at": "2026-02-22T16:57:09.303129+05:30"
+  }
+]

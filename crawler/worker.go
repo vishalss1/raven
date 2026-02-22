@@ -39,7 +39,7 @@ func fetch(ctx context.Context, rawURL string) []string {
 	if err != nil {
 		return nil
 	}
-	return parser.ExtractLinks(string(bodyBytes))
+	return parser.ExtractLinks(string(bodyBytes), rawURL)
 }
 
 func Worker(ctx context.Context, id int, jobs <-chan Job, results chan<- Result, rl *RateLimiter) {

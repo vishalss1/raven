@@ -30,7 +30,6 @@ func main() {
 
 	seeds := os.Args[3:]
 
-	// ctx cancels automatically on Ctrl+C
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
@@ -38,6 +37,7 @@ func main() {
 		MaxDepth:    maxDepth,
 		MaxPages:    maxPages,
 		WorkerCount: 3,
+		OutputPath:  "results.json",
 	}
 
 	crawler.Run(ctx, seeds, cfg)
