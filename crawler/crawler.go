@@ -21,6 +21,7 @@ func Run(ctx context.Context, seeds []string, cfg Config) {
 	results := make(chan Result, cfg.WorkerCount)
 	visited := NewVisited()
 	rl := NewRateLimiter(1, 3)
+	robots := NewRobotsCache()
 	writer := output.NewWriter(cfg.OutputPath)
 
 	for i := 1; i <= cfg.WorkerCount; i++ {
@@ -35,6 +36,10 @@ func Run(ctx context.Context, seeds []string, cfg Config) {
 			continue
 		}
 		normalized := parser.NormalizeURL(seed)
+		if !robots.IsAllowed(ctx, parsed.Host, parsed.Path) {
+			fmt.Printf("  blocked by robots.txt: %s\n", normalized)
+			continue
+		}
 		if visited.CheckAndMark(normalized) {
 			activeJobs++
 			jobs <- Job{URL: normalized, BaseHost: parsed.Host, Depth: 0}
@@ -65,6 +70,18 @@ func Run(ctx context.Context, seeds []string, cfg Config) {
 				if visited.Size() >= cfg.MaxPages {
 					continue
 				}
+
+				parsed, err := url.Parse(link)
+				if err != nil {
+					continue
+				}
+
+				// robots.txt check before dispatching
+				if !robots.IsAllowed(ctx, parsed.Host, parsed.Path) {
+					fmt.Printf("  blocked by robots.txt: %s\n", link)
+					continue
+				}
+
 				normalized := parser.NormalizeURL(link)
 				if visited.CheckAndMark(normalized) {
 					activeJobs++
