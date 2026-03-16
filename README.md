@@ -47,7 +47,7 @@ Results stream into your code in real time via a callback. The JSON output and t
 ## Installation
 
 ```bash
-git clone https://github.com/visha/raven
+git clone https://github.com/vishalss1/raven
 cd raven
 go mod tidy
 ```
