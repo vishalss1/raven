@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/url"
 
-	"raven/output"
-	"raven/parser"
+	"github.com/vishalss1/raven/output"
+	"github.com/vishalss1/raven/parser"
 )
 
 type Config struct {

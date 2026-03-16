@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"strconv"
 
-	"raven/crawler"
+	"github.com/vishalss1/raven/crawler"
 )
 
 func main() {

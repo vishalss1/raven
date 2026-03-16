@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"raven/parser"
+	"github.com/vishalss1/raven/parser"
 )
 
 type Job struct {
