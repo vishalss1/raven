@@ -16,27 +16,28 @@ That's it. Everything you need comes from that one package.
 
 ---
 
-## Features
+## Usage
 
-- **Concurrent worker pool** — N goroutines crawling in parallel
-- **BFS crawling** — breadth-first graph traversal with depth control
-- **Per-domain rate limiting** — manual token bucket, configurable burst and refill
-- **Visited-aware deduplication** — thread-safe, URL-normalized
-- **Relative link resolution** — resolves `href="/about"` against base URL correctly
-- **robots.txt respect** — fetched once per domain, cached, applied to every URL
-- **Retry with exponential backoff** — 2s → 4s → 8s, context-aware
-- **Graceful shutdown** — Ctrl+C cancels in-flight requests cleanly via context
-- **Structured JSON output** — url, depth, links_found, crawled_at per page
-- **Streaming results callback** — embed RAVEN, consume results in real time
+```go
+q := raven.NewQueue(64)
 
----
+eng := raven.NewEngine(raven.Config{
+    Fetcher:    raven.NewHTTP(raven.HTTPOptions{}),
+    Extractors: raven.DefaultExtractors,
+    Queue:      q,
+    Workers:    5,
+    Visited:    raven.NewVisited(),
+    OnResult: func(r raven.Result) {
+        for _, d := range r.Discoveries {
+            fmt.Println(d.Type, d.Value)
+        }
+    },
+})
 
-## Installation
+q.Push(raven.Task{URL: "https://example.com"})
+q.Close()
 
-```bash
-git clone https://github.com/visha/raven
-cd raven
-go mod tidy
+eng.Run(ctx)
 ```
 
 ---
