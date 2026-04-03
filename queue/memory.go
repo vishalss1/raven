@@ -7,46 +7,81 @@ import (
 	"github.com/vishalss1/raven/types"
 )
 
-// Memory is a simple buffered-channel Queue.
-// Araneae calls Push to enqueue Tasks; the Engine calls Pop to dequeue them.
-// Call Close when no more tasks will be pushed — workers drain the buffer
-// then stop.
+// Memory is a slice-backed FIFO queue that supports dynamic task insertion.
+// Push never blocks. Pop blocks until a task is available, the queue is done,
+// or the context is cancelled.
 type Memory struct {
-	ch   chan types.Task
-	once sync.Once
+	mu    sync.Mutex
+	cond  *sync.Cond
+	items []types.Task
+	done  bool
 }
 
-func NewMemory(bufferSize int) *Memory {
-	if bufferSize <= 0 {
-		bufferSize = 512
-	}
-	return &Memory{ch: make(chan types.Task, bufferSize)}
+func NewMemory() *Memory {
+	q := &Memory{}
+	q.cond = sync.NewCond(&q.mu)
+	return q
 }
 
-// Push enqueues a Task. Blocks if the buffer is full.
-// Must not be called after Close.
+// Push appends a task to the queue. Safe to call concurrently.
+// Must not be called after Done().
 func (q *Memory) Push(task types.Task) {
-	q.ch <- task
+	q.mu.Lock()
+	q.items = append(q.items, task)
+	q.mu.Unlock()
+	q.cond.Signal()
 }
 
-// Pop dequeues the next Task. Returns (task, true) on success.
-// Returns (zero, false) if the queue is closed and drained, or ctx is done.
+// Pop removes and returns the front task (FIFO). Blocks until a task is
+// available. Returns (zero, false) when the queue is done and empty, or
+// the context is cancelled.
 func (q *Memory) Pop(ctx context.Context) (types.Task, bool) {
-	select {
-	case task, ok := <-q.ch:
-		return task, ok
-	case <-ctx.Done():
+	// Watch for context cancellation in a background goroutine.
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		select {
+		case <-ctx.Done():
+			q.cond.Broadcast()
+		case <-done:
+		}
+	}()
+
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	for len(q.items) == 0 && !q.done {
+		if ctx.Err() != nil {
+			return types.Task{}, false
+		}
+		q.cond.Wait()
+	}
+
+	if ctx.Err() != nil {
 		return types.Task{}, false
 	}
+
+	if len(q.items) == 0 && q.done {
+		return types.Task{}, false
+	}
+
+	task := q.items[0]
+	q.items = q.items[1:]
+	return task, true
 }
 
-// Close signals that no more tasks will be pushed.
-// Workers drain remaining tasks then exit.
-func (q *Memory) Close() {
-	q.once.Do(func() { close(q.ch) })
+// Done signals that no more tasks will be pushed. Workers drain remaining
+// tasks then exit.
+func (q *Memory) Done() {
+	q.mu.Lock()
+	q.done = true
+	q.mu.Unlock()
+	q.cond.Broadcast()
 }
 
-// Len returns the number of tasks currently buffered (approximate).
+// Len returns the number of tasks currently buffered.
 func (q *Memory) Len() int {
-	return len(q.ch)
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return len(q.items)
 }

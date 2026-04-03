@@ -18,35 +18,39 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	q := queue.NewMemory(64)
-
 	eng := engine.New(engine.Config{
 		Fetcher: fetcher.NewHTTP(fetcher.Options{}),
 		Extractors: []engine.Extractor{
 			extractor.Link{},
-			extractor.Form{},
-			extractor.Asset{},
-			extractor.API{},
 		},
-		Queue:   q,
-		Workers: 3,
-		Visited: visited.NewMemory(),
-		OnResult: func(r types.Result) {
-			fmt.Printf("[%d] %s — %d discoveries\n",
-				r.StatusCode, r.URL, len(r.Discoveries))
-			for _, d := range r.Discoveries {
-				fmt.Printf("    %s  %s\n", d.Type, d.Value)
-			}
+		Queue:      queue.NewMemory(),
+		Workers:    3,
+		Visited:    visited.NewMemory(),
+		MaxDepth:   2,
+		MaxPages:   10,
+		DomainOnly: true,
+		AllowSubdomains: true,
+		OnDiscover: func(parent, child string, depth int) {
+			fmt.Printf("  [depth=%d] %s → %s\n", depth, parent, child)
 		},
 		OnError: func(task types.Task, err error) {
-			fmt.Printf("  ERROR %s: %v\n", task.URL, err)
+			fmt.Printf("  [ERROR] %s: %v\n", task.URL, err)
 		},
 	})
 
-	// seed one URL
-	q.Push(types.Task{URL: "https://github.com"})
-	q.Close() // single page — close immediately after seeding
+	seed := "https://github.com"
+	if len(os.Args) > 1 {
+		seed = os.Args[1]
+	}
 
-	eng.Run(ctx)
-	fmt.Println("done")
+	fmt.Printf("crawling %s (maxDepth=2, maxPages=10, domainOnly=true)\n\n", seed)
+	graph := eng.Run(ctx, seed)
+
+	fmt.Printf("\n=== Graph: %d nodes, %d edges ===\n", len(graph.Nodes), len(graph.Edges))
+	for u, node := range graph.Nodes {
+		fmt.Printf("  [depth=%d] %s\n", node.Depth, u)
+	}
+	for _, edge := range graph.Edges {
+		fmt.Printf("  %s → %s\n", edge.From, edge.To)
+	}
 }

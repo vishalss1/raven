@@ -26,13 +26,14 @@ type Extractor interface {
 	Extract(ctx context.Context, page types.Page) ([]types.Discovery, error)
 }
 
-// Queue is the task transport between Araneae and the Engine workers.
-// RAVEN only calls Pop. Araneae calls Push to feed new work.
-// Close signals workers to drain and stop.
+// Queue is the task transport for the Engine workers.
+// Push adds work dynamically during the crawl.
+// Pop blocks until a task is available, the queue is done, or ctx is cancelled.
+// Done signals that no more tasks will be pushed — workers drain then stop.
 type Queue interface {
 	Push(task types.Task)
-	Pop(ctx context.Context) (types.Task, bool) // false → queue closed
-	Close()
+	Pop(ctx context.Context) (types.Task, bool) // false → queue done+empty or ctx cancelled
+	Done()
 }
 
 // VisitedStore tracks which URLs have already been processed.

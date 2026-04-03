@@ -2,7 +2,7 @@
 
 **Rate-Limited Asynchronous Visited-Aware Engine for Network Crawling**
 
-A programmable crawl engine for Go.
+A programmable breadth-first crawl engine for Go that outputs a structured navigation graph.
 
 ---
 
@@ -19,55 +19,62 @@ That's it. Everything you need comes from that one package.
 ## Usage
 
 ```go
-q := raven.NewQueue(64)
-
 eng := raven.NewEngine(raven.Config{
-    Fetcher:    raven.NewHTTP(raven.HTTPOptions{}),
+    Fetcher:    raven.NewHTTP(fetcher.Options{}),
     Extractors: raven.DefaultExtractors,
-    Queue:      q,
+    Queue:      raven.NewQueue(),
     Workers:    5,
     Visited:    raven.NewVisited(),
-    OnResult: func(r raven.Result) {
-        for _, d := range r.Discoveries {
-            fmt.Println(d.Type, d.Value)
-        }
+    MaxDepth:   3,
+    MaxPages:   100,
+    DomainOnly: true,
+    OnDiscover: func(parent, child string, depth int) {
+        fmt.Printf("[depth=%d] %s → %s\n", depth, parent, child)
+    },
+    OnError: func(task raven.Task, err error) {
+        fmt.Printf("Error crawling %s: %v\n", task.URL, err)
     },
 })
 
-q.Push(raven.Task{URL: "https://example.com"})
-q.Close()
+graph := eng.Run(ctx, "https://example.com")
 
-eng.Run(ctx)
+fmt.Printf("Nodes: %d, Edges: %d\n", len(graph.Nodes), len(graph.Edges))
 ```
 
 ---
 
 ## What it does
 
-You push a `Task` into the queue. RAVEN fetches the page, extracts everything on it, and calls `OnResult` with what it found. That's the whole loop.
+You call `Run(ctx, seedURL)`. RAVEN performs a breadth-first crawl starting from the seed, following links across pages while respecting depth limits and domain constraints. It returns a `Graph` — a set of nodes (URLs with depth) and edges (parent → child relationships).
 
-What you do with the result — enqueue new URLs, write to a database, filter by domain, track depth — is entirely up to you. RAVEN has no opinions about crawl strategy.
+Each page is fetched, optionally rendered (for JS-heavy pages), and then extractors pull out every link. Discovered links become new tasks pushed into the queue automatically. The engine terminates when:
+
+- the queue is empty (all reachable pages crawled)
+- `MaxPages` is reached
+- the context is cancelled
 
 ---
 
-## Discoveries
+## Graph Output
 
-Every page produces a list of typed discoveries:
-
-| Type | What it is |
-|---|---|
-| `link` | Every `href` on the page, resolved and normalised |
-| `form` | Form action URL, method, and field names |
-| `asset` | Images, stylesheets |
-| `script` | External JS files |
-| `api` | Endpoints found in network logs or JS source |
+The crawl produces a structured graph:
 
 ```go
-type Discovery struct {
-    Type      string         // link | form | asset | script | api
-    Value     string         // the URL
-    SourceURL string         // which page it came from
-    Metadata  map[string]any // extractor-specific detail
+type Graph struct {
+    Nodes map[string]*Node  // keyed by normalised URL
+    Edges []Edge            // parent → child relationships
+}
+
+type Node struct {
+    URL        string
+    Depth      int
+    StatusCode int    // populated during crawl
+    LatencyMs  int64  // placeholder for future use
+}
+
+type Edge struct {
+    From string
+    To   string
 }
 ```
 
@@ -77,24 +84,76 @@ type Discovery struct {
 
 ```go
 raven.Config{
-    Fetcher    // how to fetch — default: raven.NewHTTP()
-    Renderer   // optional browser renderer for JS-heavy pages
-    Extractors // what to extract — default: raven.DefaultExtractors
-    Queue      // task queue — default: raven.NewQueue()
-    Visited    // deduplication — default: raven.NewVisited()
-    Workers    // goroutine concurrency
-    OnResult   // called for every completed page
-    OnError    // called on fetch failure
+    Fetcher     // how to fetch — default: raven.NewHTTP()
+    Renderer    // optional browser renderer for JS-heavy pages
+    Extractors  // what to extract — default: raven.DefaultExtractors (Link only)
+    Queue       // task queue — default: raven.NewQueue()
+    Visited     // deduplication — default: raven.NewVisited()
+    Workers     // goroutine concurrency (default: 5)
+
+    MaxDepth    // max link depth from seed (0 = unlimited)
+    MaxPages    // max pages to crawl (0 = unlimited)
+    MaxEdges    // max edges in graph (0 = unlimited)
+    DomainOnly  // restrict to seed URL's host or subdomains
+    AllowSubdomains // allow subdomains of the seed host
+
+    OnDiscover  // callback: func(parent, child string, depth int)
+    OnError     // callback: func(task raven.Task, err error)
 }
 ```
 
-All fields except `Fetcher` and `Queue` are optional.
+---
+
+## URL Normalization
+
+RAVEN normalises all URLs before deduplication:
+
+- force scheme to `https` (treats http/https as same)
+- lowercase host
+- strip query parameters (`?ref=...`)
+- strip fragments (`#...`)
+- remove trailing slash
+- collapse duplicate slashes (`//`)
+
+Use `raven.NormalizeURL(url)` directly if needed.
+
+---
+
+## Domain Restriction
+
+When `DomainOnly: true`, the engine only enqueues URLs that share the same hostname as the seed. Cross-domain links still appear as edges in the graph but are not crawled.
+
+---
+
+## Extractors
+
+The default extractor set for graph crawling is `Link` only. Additional extractors are available:
+
+| Extractor | What it finds |
+|---|---|
+| `extractor.Link{}` | Every `href` on the page, resolved and normalised |
+| `extractor.Form{}` | Form action URL, method, and field names |
+| `extractor.Asset{}` | Images, stylesheets |
+| `extractor.API{}` | Endpoints found in network logs or JS source |
+
+Pass them explicitly if you need richer discovery data:
+
+```go
+Extractors: []engine.Extractor{
+    extractor.Link{},
+    extractor.Form{},
+    extractor.Asset{},
+    extractor.API{},
+},
+```
+
+Only `Link` discoveries are used for graph edge creation and task enqueuing.
 
 ---
 
 ## Plugging in a browser renderer
 
-By default RAVEN parses raw HTML. For JS-rendered pages, implement `raven.Renderer` with a headless browser (Playwright, rod, chromedp) and pass it into `Config.Renderer`. The extractors receive a `Page` either way — they never know whether a browser was involved.
+By default RAVEN parses raw HTML. For JS-rendered pages, implement `engine.Renderer` with a headless browser (Playwright, rod, chromedp) and pass it into `Config.Renderer`. The extractors receive a `Page` either way — they never know whether a browser was involved.
 
 See `renderer/noop.go` for the implementation guide.
 
@@ -102,7 +161,7 @@ See `renderer/noop.go` for the implementation guide.
 
 ## Bringing your own deduplication
 
-`raven.NewVisited()` is an in-memory set — fine for a single process. For distributed crawls, implement `raven.VisitedStore`:
+`raven.NewVisited()` is an in-memory set with URL normalisation — fine for a single process. For distributed crawls, implement `engine.VisitedStore`:
 
 ```go
 type VisitedStore interface {
